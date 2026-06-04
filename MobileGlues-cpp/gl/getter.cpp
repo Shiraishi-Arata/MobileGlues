@@ -290,6 +290,7 @@ const GLubyte* glGetString(GLenum name) {
 #endif
 #endif
                 versionString += VERSION_SUFFIX;
+                versionString += "§f(§dYukari Launcher§f)§r";
             } else {
                 const char choices[] = "AIN";
                 versionString += " ";
