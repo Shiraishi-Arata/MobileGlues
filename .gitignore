@@ -1,6 +1,8 @@
 /build
 .cxx/
-.idea/
+.gradle/
+.idea/.
+local.properties
 src/main/cpp/.vs
 src/main/cpp/out
 src/main/cpp/CMakeSettings.json

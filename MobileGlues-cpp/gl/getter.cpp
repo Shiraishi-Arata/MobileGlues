@@ -14,6 +14,10 @@
 #include "FSR1/FSR1.h"
 #include "log.h"
 #include "random_string_gen.h"
+#include "../config/gpu_utils.h"
+#if !defined(__APPLE__)
+#include "vulkan/vulkan.h"
+#endif
 
 #define DEBUG 0
 
@@ -209,6 +213,25 @@ std::string getGpuName() {
         std::string vulkanVersion = gpuName.substr(vulkanStart + 7, vulkanEnd - (vulkanStart + 7));
 
         std::string formattedGpuName = gpu + " | ANGLE | Vulkan " + vulkanVersion;
+
+#if !defined(__APPLE__)
+        const VulkanDeviceInfo& vkInfo = getVulkanDeviceInfo();
+        if (vkInfo.available) {
+            std::string deviceType;
+            switch (vkInfo.deviceType) {
+            case VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU: deviceType = "dGPU"; break;
+            case VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU: deviceType = "iGPU"; break;
+            default: deviceType = ""; break;
+            }
+            if (!deviceType.empty()) {
+                formattedGpuName += " (" + deviceType;
+                if (vkInfo.totalVRAM > 0) {
+                    formattedGpuName += " " + std::to_string(vkInfo.totalVRAM / (1024 * 1024)) + "MB";
+                }
+                formattedGpuName += ")";
+            }
+        }
+#endif
 
         return formattedGpuName;
     }

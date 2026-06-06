@@ -111,10 +111,6 @@ void prepare_indirect_buffer(const GLsizei* counts, GLenum type, const void* con
 
     LOG_D("After resize: %d", g_cmdbufsize)
 
-    auto* pcmds = (draw_elements_indirect_command_t*)GLES.glMapBufferRange(
-        GL_DRAW_INDIRECT_BUFFER, 0, primcount * sizeof(draw_elements_indirect_command_t),
-        GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT);
-
     GLsizei elementSize;
     switch (type) {
     case GL_UNSIGNED_BYTE:
@@ -130,16 +126,17 @@ void prepare_indirect_buffer(const GLsizei* counts, GLenum type, const void* con
         elementSize = 4;
     }
 
+    std::vector<draw_elements_indirect_command_t> cmds(primcount);
     for (GLsizei i = 0; i < primcount; ++i) {
         auto byteOffset = reinterpret_cast<uintptr_t>(indices[i]);
-        pcmds[i].firstIndex = static_cast<GLuint>(byteOffset / elementSize);
-        pcmds[i].count = counts[i];
-        pcmds[i].instanceCount = 1;
-        pcmds[i].baseVertex = basevertex ? basevertex[i] : 0;
-        pcmds[i].reservedMustBeZero = 0;
+        cmds[i].firstIndex = static_cast<GLuint>(byteOffset / elementSize);
+        cmds[i].count = counts[i];
+        cmds[i].instanceCount = 1;
+        cmds[i].baseVertex = basevertex ? basevertex[i] : 0;
+        cmds[i].reservedMustBeZero = 0;
     }
 
-    GLES.glUnmapBuffer(GL_DRAW_INDIRECT_BUFFER);
+    GLES.glBufferSubData(GL_DRAW_INDIRECT_BUFFER, 0, primcount * sizeof(draw_elements_indirect_command_t), cmds.data());
 }
 
 void mg_glMultiDrawElementsBaseVertex_drawelements(GLenum mode, GLsizei* counts, GLenum type,
@@ -261,8 +258,10 @@ void mg_glMultiDrawElementsBaseVertex_multiindirect(GLenum mode, GLsizei* counts
 
     prepare_indirect_buffer(counts, type, indices, primcount, basevertex);
 
-    // Multi-draw indirect!
-    GLES.glMultiDrawElementsIndirectEXT(mode, type, 0, primcount, 0);
+    for (GLsizei i = 0; i < primcount; ++i) {
+        const GLvoid* offset = reinterpret_cast<GLvoid*>(i * sizeof(draw_elements_indirect_command_t));
+        GLES.glDrawElementsIndirect(mode, type, offset);
+    }
 
     GLES.glBindBuffer(GL_DRAW_INDIRECT_BUFFER, prevIndirectBuffer);
 
@@ -344,8 +343,10 @@ void mg_glMultiDrawElements_multiindirect(GLenum mode, const GLsizei* count, GLe
 
     prepare_indirect_buffer(count, type, indices, primcount, 0);
 
-    // Multi-draw indirect!
-    GLES.glMultiDrawElementsIndirectEXT(mode, type, 0, primcount, 0);
+    for (GLsizei i = 0; i < primcount; ++i) {
+        const GLvoid* offset = reinterpret_cast<GLvoid*>(i * sizeof(draw_elements_indirect_command_t));
+        GLES.glDrawElementsIndirect(mode, type, offset);
+    }
 
     GLES.glBindBuffer(GL_DRAW_INDIRECT_BUFFER, prevIndirectBuffer);
 

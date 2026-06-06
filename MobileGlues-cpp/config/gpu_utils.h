@@ -10,8 +10,45 @@
 
 #include <string.h>
 #include <string>
+#include <cstdint>
+
+struct VulkanDeviceInfo {
+    bool available = false;
+    std::string deviceName;
+    uint32_t apiVersion = 0;
+    uint32_t driverVersion = 0;
+    uint32_t vendorID = 0;
+    uint32_t deviceID = 0;
+    int deviceType = -1;
+
+    bool supportsVulkan11 = false;
+    bool supportsVulkan12 = false;
+    bool supportsVulkan13 = false;
+
+    uint64_t dedicatedVRAM = 0;
+    uint64_t totalVRAM = 0;
+
+    uint32_t graphicsQueueCount = 0;
+    uint32_t computeQueueCount = 0;
+    uint32_t transferQueueCount = 0;
+
+    bool hasMultiDrawIndirect = false;
+    bool hasDrawIndirectFirstInstance = false;
+    bool hasGeometryShader = false;
+    bool hasTessellationShader = false;
+    bool hasDualSrcBlend = false;
+    bool hasSamplerMirrorClampEdge = false;
+    bool hasDescriptorIndexing = false;
+    bool hasDynamicRendering = false;
+    bool hasSynchronization2 = false;
+    bool hasShaderOutputLayer = false;
+    bool hasShaderOutputViewportIndex = false;
+
+    std::string toString() const;
+};
 
 std::string getGPUInfo();
+const VulkanDeviceInfo& getVulkanDeviceInfo();
 
 #ifdef __cplusplus
 extern "C"

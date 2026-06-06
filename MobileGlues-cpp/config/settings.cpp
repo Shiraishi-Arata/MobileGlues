@@ -11,6 +11,9 @@
 #include "../gl/envvars.h"
 #include "gpu_utils.h"
 #include "../gl/getter.h"
+#if !defined(__APPLE__)
+#include "vulkan/vulkan.h"
+#endif
 
 #define DEBUG 0
 
@@ -136,6 +139,18 @@ void init_settings() {
     LOG_D("Is Adreno 740? = %s", is740 ? "true" : "false")
     LOG_D("Is Adreno 830? = %s", is830 ? "true" : "false")
     LOG_D("Is ANGLE supported? = %s", isANGLESupported ? "true" : "false")
+
+    const VulkanDeviceInfo& vkInfo = getVulkanDeviceInfo();
+    LOG_D("Vulkan Device: %s", vkInfo.available ? vkInfo.deviceName.c_str() : "N/A")
+    if (vkInfo.available) {
+        LOG_D("Vulkan API: %d.%d.%d, Driver: %d.%d.%d",
+              VK_API_VERSION_MAJOR(vkInfo.apiVersion), VK_API_VERSION_MINOR(vkInfo.apiVersion),
+              VK_API_VERSION_PATCH(vkInfo.apiVersion),
+              VK_VERSION_MAJOR(vkInfo.driverVersion), VK_VERSION_MINOR(vkInfo.driverVersion),
+              VK_VERSION_PATCH(vkInfo.driverVersion))
+        LOG_D("Vulkan Features: DescriptorIndexing=%d, DynamicRendering=%d, Sync2=%d",
+              vkInfo.hasDescriptorIndexing, vkInfo.hasDynamicRendering, vkInfo.hasSynchronization2)
+    }
 
     switch (angleConfig) {
     case AngleConfig::ForceDisable:
@@ -295,6 +310,22 @@ void init_settings_post() {
         } else if (indirect) {
             global_settings.multidraw_mode = multidraw_mode_t::PreferIndirect;
             LOG_V("    -> Indirect (Preferred not supported, falling back)")
+        } else {
+            global_settings.multidraw_mode = multidraw_mode_t::DrawElements;
+            LOG_V("    -> DrawElements (Preferred not supported, falling back)")
+        }
+        break;
+    case multidraw_mode_t::PreferMultidrawIndirect:
+        LOG_V("multidrawMode = PreferMultidrawIndirect")
+        if (multidraw) {
+            global_settings.multidraw_mode = multidraw_mode_t::PreferMultidrawIndirect;
+            LOG_V("    -> MultidrawIndirect (OK)")
+        } else if (indirect) {
+            global_settings.multidraw_mode = multidraw_mode_t::PreferIndirect;
+            LOG_V("    -> Indirect (Preferred not supported, falling back)")
+        } else if (basevertex) {
+            global_settings.multidraw_mode = multidraw_mode_t::PreferBaseVertex;
+            LOG_V("    -> BaseVertex (Preferred not supported, falling back)")
         } else {
             global_settings.multidraw_mode = multidraw_mode_t::DrawElements;
             LOG_V("    -> DrawElements (Preferred not supported, falling back)")
