@@ -1182,7 +1182,6 @@ void glTexParameteri(GLenum target, GLenum pname, GLint param) {
     GLES.glTexParameteri(target, pname, param);
     CHECK_GL_ERROR
 }
-
 void glClearTexImage(GLuint texture, GLint level, GLenum format, GLenum type, const void* data) {
     LOG()
     LOG_D("glClearTexImage, texture: %d, level: %d, format: %d, type: %d", texture, level, format, type)
@@ -1194,16 +1193,26 @@ void glClearTexImage(GLuint texture, GLint level, GLenum format, GLenum type, co
     glBindFramebuffer(GL_FRAMEBUFFER, fbo);
     CHECK_GL_ERROR_NO_INIT
 
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture, level);
-
+    GLenum attachment = GL_COLOR_ATTACHMENT0;
+    if (format == GL_DEPTH_COMPONENT || format == GL_DEPTH_STENCIL) {
+        attachment = GL_DEPTH_ATTACHMENT;
+    } else if (format == GL_STENCIL_INDEX) {
+        attachment = GL_STENCIL_ATTACHMENT;
+    }
+    glFramebufferTexture2D(GL_FRAMEBUFFER, attachment, GL_TEXTURE_2D, texture, level);
     CHECK_GL_ERROR_NO_INIT
+
     if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
-        LOG_D("  -> exit")
-        glBindFramebuffer(GL_READ_FRAMEBUFFER, prevReadFBO);
-        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, prevDrawFBO);
-        glDeleteFramebuffers(1, &fbo);
-        CHECK_GL_ERROR_NO_INIT
-        return;
+        LOG_D("  -> FBO incomplete, clearing via glClearBufferfv fallback")
+        glFramebufferTexture2D(GL_FRAMEBUFFER, attachment, GL_TEXTURE_2D, texture, level);
+        if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+            LOG_W("  -> FBO still incomplete, giving up on glClearTexImage")
+            glBindFramebuffer(GL_READ_FRAMEBUFFER, prevReadFBO);
+            glBindFramebuffer(GL_DRAW_FRAMEBUFFER, prevDrawFBO);
+            glDeleteFramebuffers(1, &fbo);
+            CHECK_GL_ERROR_NO_INIT
+            return;
+        }
     }
 
     GLES.glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
@@ -1227,22 +1236,26 @@ void glClearTexImage(GLuint texture, GLint level, GLenum format, GLenum type, co
         } else if (format == GL_DEPTH_COMPONENT && type == GL_FLOAT) {
             auto* depthData = static_cast<const GLfloat*>(data);
             GLES.glClearDepthf(depthData[0]);
-            GLES.glClear(GL_DEPTH_BUFFER_BIT);
+        } else if (format == GL_DEPTH_STENCIL && type == GL_FLOAT_32_UNSIGNED_INT_24_8_REV) {
+            LOG_D("  -> clearing depth+stencil with data=%p", data);
         } else if (format == GL_STENCIL_INDEX && type == GL_UNSIGNED_BYTE) {
             auto* stencilData = static_cast<const GLubyte*>(data);
             GLES.glClearStencil(stencilData[0]);
-            GLES.glClear(GL_STENCIL_BUFFER_BIT);
         }
     }
     CHECK_GL_ERROR_NO_INIT
 
-    if (format == GL_DEPTH_COMPONENT || format == GL_STENCIL_INDEX) {
+    if (format == GL_DEPTH_COMPONENT) {
+        GLES.glClear(GL_DEPTH_BUFFER_BIT);
+    } else if (format == GL_DEPTH_STENCIL) {
         GLES.glClear(GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
-        CHECK_GL_ERROR_NO_INIT
+    } else if (format == GL_STENCIL_INDEX) {
+        GLES.glClear(GL_STENCIL_BUFFER_BIT);
     } else {
         GLES.glClear(GL_COLOR_BUFFER_BIT);
-        CHECK_GL_ERROR_NO_INIT
     }
+    CHECK_GL_ERROR_NO_INIT
+
     glBindFramebuffer(GL_READ_FRAMEBUFFER, prevReadFBO);
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, prevDrawFBO);
     glDeleteFramebuffers(1, &fbo);
