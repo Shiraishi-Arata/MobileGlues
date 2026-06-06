@@ -16,6 +16,7 @@
 #include "glsl/glsl_for_es.h"
 #include "../config/settings.h"
 #include "FSR1/FSR1.h"
+#include "FG/FG.h"
 
 #define DEBUG 0
 
@@ -127,6 +128,9 @@ void glGetShaderiv(GLuint shader, GLenum pname, GLint* params) {
 GLuint glCreateShader(GLenum shaderType) {
     if (global_settings.fsr1_setting != FSR1_Quality_Preset::Disabled && !fsrInitialized) {
         InitFSRResources();
+    }
+    if (global_settings.frame_generation_enabled && !fgInitialized) {
+        InitFGResources();
     }
 
     LOG()

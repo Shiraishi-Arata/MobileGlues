@@ -8,6 +8,7 @@
 #include "egl.h"
 #include "../config/settings.h"
 #include "../gl/FSR1/FSR1.h"
+#include "../gl/FG/FG.h"
 #include "../gl/log.h"
 #include "../gl/mg.h"
 #include "../gles/loader.h"
@@ -224,10 +225,14 @@ extern "C"
         LOG_D("eglSwapBuffers, dpy: %p, surface: %p", dpy, surface);
         LOAD_EGL(eglSwapBuffers)
         EGLBoolean result;
+
         if (global_settings.fsr1_setting != FSR1_Quality_Preset::Disabled) {
             ApplyFSR();
             result = egl_eglSwapBuffers(dpy, surface);
             CheckResolutionChange();
+        } else if (global_settings.frame_generation_enabled) {
+            ApplyFG();
+            result = egl_eglSwapBuffers(dpy, surface);
         } else {
             result = egl_eglSwapBuffers(dpy, surface);
         }

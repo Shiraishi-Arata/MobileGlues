@@ -120,6 +120,9 @@ void InitGLESBaseExtensions() {
         extensions.push_back("GL_MG_mobileglues");
         extensions.push_back("GL_MG_backend_string_getter_access");
         extensions.push_back("GL_MG_settings_string_dump");
+        if (global_settings.frame_generation_enabled) {
+            extensions.push_back("GL_MG_frame_generation");
+        }
     }
 
     const char* base_exts[] = {"GL_ARB_fragment_program",

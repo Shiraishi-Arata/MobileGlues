@@ -109,6 +109,7 @@ add_library(${CMAKE_PROJECT_NAME} SHARED
     gl/glsl/glsl_for_es.cpp
     gl/glsl/cache.cpp
     gl/FSR1/FSR1.cpp
+    gl/FG/FG.cpp
 
     gl/vertexattrib.cpp
     glx/lookup.cpp
