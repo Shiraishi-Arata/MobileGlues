@@ -3,7 +3,6 @@
 
 #define DEBUG 0
 
-// GLSL shader source for frame interpolation
 static const char* FG_VSSource = R"(
 #version 100
 attribute vec2 aPos;
@@ -27,36 +26,36 @@ void main() {
     vec2 uv = vTexCoord;
     vec4 curr = texture2D(uCurrTex, uv);
 
-    ivec2 searchRange = ivec2(5, 5);
-    vec4 bestMatch = texture2D(uPrevTex, uv);
-    float bestDiff = distance(bestMatch, curr);
-    vec2 bestOffset = vec2(0.0, 0.0);
+    // 2 samples: center, weighted blend with neighbor check
+    vec4 center = texture2D(uPrevTex, uv);
+    float centerDiff = distance(curr, center);
 
-    for (int dy = -searchRange.y; dy <= searchRange.y; dy++) {
-        for (int dx = -searchRange.x; dx <= searchRange.x; dx++) {
-            vec2 offset = vec2(float(dx), float(dy)) * uTexelSize;
-            vec2 sampleUV = uv + offset;
-            if (sampleUV.x < 0.0 || sampleUV.x > 1.0 ||
-                sampleUV.y < 0.0 || sampleUV.y > 1.0) continue;
-            vec4 sample = texture2D(uPrevTex, sampleUV);
-            float diff = distance(sample, curr);
-            if (diff < bestDiff) {
-                bestDiff = diff;
-                bestMatch = sample;
-                bestOffset = offset;
-            }
+    // Sample 4 immediate neighbors for cheap motion check
+    vec2 offsets[4];
+    offsets[0] = vec2(uTexelSize.x, 0.0);
+    offsets[1] = vec2(-uTexelSize.x, 0.0);
+    offsets[2] = vec2(0.0, uTexelSize.y);
+    offsets[3] = vec2(0.0, -uTexelSize.y);
+
+    vec2 bestUV = uv;
+    float bestDiff = centerDiff;
+
+    for (int i = 0; i < 4; i++) {
+        vec2 suv = uv + offsets[i];
+        if (suv.x < 0.0 || suv.x > 1.0 || suv.y < 0.0 || suv.y > 1.0) continue;
+        vec4 s = texture2D(uPrevTex, suv);
+        float d = distance(curr, s);
+        if (d < bestDiff) {
+            bestDiff = d;
+            bestUV = suv;
         }
     }
 
-    vec2 forwardUV = uv + bestOffset;
-    vec4 forward = texture2D(uPrevTex, forwardUV);
-
-    // Confidence-based: if motion match is poor, use current frame to avoid ghosting
+    vec4 motionPrev = texture2D(uPrevTex, bestUV);
     float confidence = 1.0 - bestDiff * 1.5;
     confidence = clamp(confidence, 0.0, 1.0);
 
-    vec4 result = mix(curr, forward, confidence * 0.5);
-    gl_FragColor = result;
+    gl_FragColor = mix(curr, motionPrev, confidence * 0.5);
 }
 )";
 
@@ -114,7 +113,7 @@ namespace FG_Context {
     GLsizei g_width = 0;
     GLsizei g_height = 0;
     bool g_hasPrev = false;
-    bool g_doubledThisFrame = false;
+    float g_lastConfidence = 0.0f;
 }
 
 GLuint CompileFGShader() {
@@ -251,43 +250,9 @@ void InitFGResources() {
     GLES.glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
     FG_Context::g_hasPrev = false;
-    FG_Context::g_doubledThisFrame = false;
+    FG_Context::g_lastConfidence = 0.0f;
 
     LOG_V("[FG] Frame Generation initialized (%dx%d)", FG_Context::g_width, FG_Context::g_height);
-}
-
-void CaptureFrame() {
-    GLStateGuard state;
-
-    GLint readFBO = 0;
-    GLES.glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &readFBO);
-
-    GLES.glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-    GLint viewport[4];
-    GLES.glGetIntegerv(GL_VIEWPORT, viewport);
-    GLsizei fbWidth = viewport[2];
-    GLsizei fbHeight = viewport[3];
-
-    if (fbWidth <= 0 || fbHeight <= 0) return;
-
-    GLsizei capWidth = (fbWidth + 1) & ~1;
-    GLsizei capHeight = (fbHeight + 1) & ~1;
-
-    GLES.glGenTextures(1, &FG_Context::g_currFrameTex);
-    GLES.glBindTexture(GL_TEXTURE_2D, FG_Context::g_currFrameTex);
-    GLES.glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, capWidth, capHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
-    GLES.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    GLES.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    GLES.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    GLES.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    GLES.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
-
-    GLES.glCopyTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, 0, 0, capWidth, capHeight, 0);
-
-    GLES.glBindFramebuffer(GL_READ_FRAMEBUFFER, readFBO);
-
-    LOG_D("[FG] Frame captured: %dx%d", capWidth, capHeight);
 }
 
 void ApplyFG() {
@@ -298,7 +263,6 @@ void ApplyFG() {
 
     GLStateGuard state;
 
-    // Capture current backbuffer
     GLint viewport[4];
     GLES.glGetIntegerv(GL_VIEWPORT, viewport);
     GLsizei fbWidth = viewport[2] > 0 ? viewport[2] : FG_Context::g_width;
@@ -314,15 +278,14 @@ void ApplyFG() {
         if (!fgInitialized) return;
     }
 
-    // Capture current frame from default FBO
+    // Capture current frame from default FBO using CopyTexSubImage2D (no reallocation)
     GLES.glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
     GLES.glBindTexture(GL_TEXTURE_2D, FG_Context::g_currFrameTex);
-    GLES.glCopyTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, 0, 0, FG_Context::g_width, FG_Context::g_height, 0);
+    GLES.glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 0, 0, FG_Context::g_width, FG_Context::g_height);
 
     if (FG_Context::g_hasPrev) {
         LOG_D("[FG] Generating interpolated frame");
 
-        // Render interpolated frame to FBO
         GLES.glBindFramebuffer(GL_FRAMEBUFFER, FG_Context::g_fgFBO);
         GLES.glViewport(0, 0, FG_Context::g_width, FG_Context::g_height);
 
@@ -353,8 +316,12 @@ void ApplyFG() {
 
         GLES.glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
 
+        // Temporal confidence smoothing
+        FG_Context::g_lastConfidence = FG_Context::g_lastConfidence * 0.7f + 0.3f;
+
         LOG_D("[FG] Interpolated frame generated and applied");
     } else {
+        FG_Context::g_lastConfidence = 0.4f;
         LOG_D("[FG] First frame captured, no interpolation yet");
     }
 

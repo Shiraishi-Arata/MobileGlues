@@ -35,7 +35,7 @@ namespace FG_Context {
     extern GLsizei g_width;
     extern GLsizei g_height;
     extern bool g_hasPrev;
-    extern bool g_doubledThisFrame;
+    extern float g_lastConfidence;
 }
 
 extern bool fgInitialized;
