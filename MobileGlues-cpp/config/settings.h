@@ -148,12 +148,12 @@ struct Version {
     bool isEmpty() const { return Major == 0 && Minor == 0 && Patch == 0; }
 };
 
-typedef enum class FSR1_Quality_Preset : int { // may be useless
+typedef enum class FSR1_Quality_Preset : int {
     Disabled = 0,
-    UltraQuality, // 1
-    Quality,      // 2
-    Balanced,     // 3
-    Performance,  // 4
+    Performance,  // 1 (2.0x)
+    Balanced,     // 2 (1.7x)
+    Quality,      // 3 (1.5x)
+    UltraQuality, // 4 (1.3x)
     MaxValue      // 5
 };
 

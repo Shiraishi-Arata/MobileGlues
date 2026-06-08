@@ -428,17 +428,17 @@ std::string dump_settings_string(std::string prefix) {
     case FSR1_Quality_Preset::Disabled:
         ss << "Disabled";
         break;
-    case FSR1_Quality_Preset::UltraQuality:
-        ss << "UltraQuality";
-        break;
-    case FSR1_Quality_Preset::Quality:
-        ss << "Quality";
+    case FSR1_Quality_Preset::Performance:
+        ss << "Performance";
         break;
     case FSR1_Quality_Preset::Balanced:
         ss << "Balanced";
         break;
-    case FSR1_Quality_Preset::Performance:
-        ss << "Performance";
+    case FSR1_Quality_Preset::Quality:
+        ss << "Quality";
+        break;
+    case FSR1_Quality_Preset::UltraQuality:
+        ss << "UltraQuality";
         break;
     default:
         ss << "Unknown";
