@@ -12,6 +12,7 @@
 #include <vector>
 #include <random>
 #include "FSR1/FSR1.h"
+#include "FG/FG.h"
 #include "log.h"
 #include "random_string_gen.h"
 #include "../config/gpu_utils.h"
@@ -120,8 +121,8 @@ void InitGLESBaseExtensions() {
         extensions.push_back("GL_MG_mobileglues");
         extensions.push_back("GL_MG_backend_string_getter_access");
         extensions.push_back("GL_MG_settings_string_dump");
-        if (global_settings.frame_generation_enabled) {
-            extensions.push_back("GL_MG_frame_generation");
+        if (global_settings.fsr3_frame_generation_enabled) {
+            extensions.push_back("GL_MG_fsr3_frame_generation");
         }
     }
 

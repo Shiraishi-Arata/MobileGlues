@@ -129,8 +129,8 @@ GLuint glCreateShader(GLenum shaderType) {
     if (global_settings.fsr1_setting != FSR1_Quality_Preset::Disabled && !fsrInitialized) {
         InitFSRResources();
     }
-    if (global_settings.frame_generation_enabled && !fgInitialized) {
-        InitFGResources();
+    if (global_settings.fsr3_frame_generation_enabled && !fsr3Initialized) {
+        InitFSR3FGResources();
     }
 
     LOG()

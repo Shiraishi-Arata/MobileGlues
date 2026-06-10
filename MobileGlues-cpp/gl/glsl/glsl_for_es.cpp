@@ -354,7 +354,7 @@ std::string GLSLtoGLSLES(const char* glsl_code, GLenum glsl_type, uint essl_vers
 }
 
 std::string replace_line_starting_with(const std::string& glslCode, const std::string& starting,
-                                       const std::string& substitution = "") {
+                                        const std::string& substitution = "") {
     std::string result;
     size_t length = glslCode.size();
     size_t start = 0;
@@ -373,10 +373,11 @@ std::string replace_line_starting_with(const std::string& glslCode, const std::s
             current++;
         }
 
-        // Check whether #line directive
-        bool isLineDirective = false;
-        if (current + 5 <= length && glslCode.compare(current, 5, "#line") == 0) {
-            isLineDirective = true;
+        // Check whether line starts with the given prefix
+        bool matches = false;
+        if (current + starting.length() <= length &&
+            glslCode.compare(current, starting.length(), starting) == 0) {
+            matches = true;
         }
 
         // Move to line end
@@ -394,22 +395,16 @@ std::string replace_line_starting_with(const std::string& glslCode, const std::s
             }
         }
 
-        if (isLineDirective) {
-            // Find #line directive ->
-            //  1. Append chunk
-            append_chunk(lineStart); // from chunk_begin to before `#line`
-            // 2. Skip this line (incl. \n)
+        if (matches) {
+            append_chunk(lineStart);
             current += newlineLength;
-            start = current; // 3. Starting from next line
-
+            start = current;
             result += substitution;
         } else {
-            // move to a new line
             current += newlineLength;
         }
     }
 
-    // append last block
     append_chunk(current);
     return result;
 }
@@ -741,10 +736,19 @@ int get_or_add_glsl_version(std::string& glsl) {
     if (glsl_version == -1) {
         glsl_version = 150;
         glsl.insert(0, "#version 150\n");
-    } else if (glsl_version < 140) {
-        // force upgrade glsl version
-        glsl = replace_line_starting_with(glsl, "#version", "#version 150 compatibility\n");
-        glsl_version = 150;
+    } else {
+        std::regex es_regex(R"(#version\s+\d{3}\s+es)", std::regex_constants::icase);
+        bool is_es = std::regex_search(glsl, es_regex);
+
+        if (is_es && glsl_version < 310) {
+            // Upgrade ES shaders to version 310 for SPIR-V compatibility
+            glsl = replace_line_starting_with(glsl, "#version", "#version 310 es\n");
+            glsl_version = 310;
+        } else if (!is_es && glsl_version < 140) {
+            // Force upgrade old desktop shaders
+            glsl = replace_line_starting_with(glsl, "#version", "#version 150 compatibility\n");
+            glsl_version = 150;
+        }
     }
 
     LOG_D("GLSL version: %d", glsl_version)

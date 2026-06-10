@@ -30,7 +30,7 @@ void init_settings() {
     global_settings.ext_direct_state_access = true;
     global_settings.custom_gl_version = {0, 0, 0}; // will go default
     global_settings.fsr1_setting = FSR1_Quality_Preset::Disabled;
-    global_settings.frame_generation_enabled = false;
+    global_settings.fsr3_frame_generation_enabled = false;
     global_settings.hide_mg_env_level = HideMGEnvLevel::Disabled;
 
 #else
@@ -56,7 +56,7 @@ void init_settings() {
     int customGLVersionInt = success ? config_get_int("customGLVersion") : DEFAULT_GL_VERSION;
     FSR1_Quality_Preset fsr1Setting =
         success ? static_cast<FSR1_Quality_Preset>(config_get_int("fsr1Setting")) : FSR1_Quality_Preset::Disabled;
-    bool enableFrameGeneration = success ? (config_get_int("enableFrameGeneration") > 0) : false;
+    bool enableFrameGeneration = success ? (config_get_int("enableFSR3FrameGeneration") > 0) : false;
     HideMGEnvLevel hideMGEnvLevel =
         success ? static_cast<HideMGEnvLevel>(config_get_int("hideMGEnvLevel")) : HideMGEnvLevel::Disabled;
 
@@ -208,7 +208,7 @@ void init_settings() {
     global_settings.angle_depth_clear_fix_mode = angleDepthClearFixMode;
     global_settings.custom_gl_version = customGLVersion;
     global_settings.fsr1_setting = fsr1Setting;
-    global_settings.frame_generation_enabled = enableFrameGeneration;
+    global_settings.fsr3_frame_generation_enabled = enableFrameGeneration;
     global_settings.hide_mg_env_level = hideMGEnvLevel;
 #endif
 
@@ -233,8 +233,8 @@ void init_settings() {
               global_settings.custom_gl_version.toString().c_str());
     }
     LOG_V("[MobileGlues] Setting: fsr1Setting                 = %i", static_cast<int>(global_settings.fsr1_setting))
-    LOG_V("[MobileGlues] Setting: frameGeneration             = %s",
-          global_settings.frame_generation_enabled ? "true" : "false")
+    LOG_V("[MobileGlues] Setting: fsr3FrameGeneration          = %s",
+          global_settings.fsr3_frame_generation_enabled ? "true" : "false")
     LOG_V("[MobileGlues] Setting: hideMGEnvLevel              = %i",
           static_cast<int>(global_settings.hide_mg_env_level))
 
@@ -420,7 +420,7 @@ std::string dump_settings_string(std::string prefix) {
     ss << prefix << "CustomGLVersion: "
        << ((GLVersion.toInt(2) == DEFAULT_GL_VERSION) ? "(Default)" : std::to_string(GLVersion.toInt(2))) << "\n";
 
-    ss << prefix << "FrameGeneration: " << (global_settings.frame_generation_enabled ? "Enabled" : "Disabled") << "\n";
+    ss << prefix << "FSR3FrameGeneration: " << (global_settings.fsr3_frame_generation_enabled ? "Enabled" : "Disabled") << "\n";
 
     ss << prefix << "Fsr1Setting: ";
 

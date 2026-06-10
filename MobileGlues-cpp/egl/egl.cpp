@@ -230,8 +230,8 @@ extern "C"
             ApplyFSR();
             result = egl_eglSwapBuffers(dpy, surface);
             CheckResolutionChange();
-        } else if (global_settings.frame_generation_enabled) {
-            ApplyFG();
+        } else if (global_settings.fsr3_frame_generation_enabled) {
+            ApplyFSR3FG();
             result = egl_eglSwapBuffers(dpy, surface);
         } else {
             result = egl_eglSwapBuffers(dpy, surface);
