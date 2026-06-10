@@ -22,6 +22,7 @@
 #include "framebuffer.h"
 #include "log.h"
 #include "mg.h"
+#include "pixel.h"
 #include <GL/gl.h>
 #include <ankerl/unordered_dense.h>
 
@@ -569,32 +570,16 @@ void glTexImage2D(GLenum target, GLint level, GLint internalFormat, GLsizei widt
     tex->swizzle_param[2] = GL_BLUE;
     tex->swizzle_param[3] = GL_ALPHA;
 
-    if (transfer_format == GL_BGRA && tex->format != transfer_format && internalFormat == GL_RGBA8 && width <= 128 &&
-        height <= 128) { // xaero has 64x64 tiles...hack here
-        LOG_D("Detected GL_BGRA format @ tex = %d, do swizzle", tex->texture)
-        if (tex->swizzle_param[0] == 0) { // assert this as never called glTexParameteri(...,
-                                          // GL_TEXTURE_SWIZZLE_R, ...)
-            tex->swizzle_param[0] = GL_RED;
-            tex->swizzle_param[1] = GL_GREEN;
-            tex->swizzle_param[2] = GL_BLUE;
-            tex->swizzle_param[3] = GL_ALPHA;
-        }
-
-        GLint r = tex->swizzle_param[0];
-        GLint g = tex->swizzle_param[1];
-        GLint b = tex->swizzle_param[2];
-        GLint a = tex->swizzle_param[3];
-        tex->swizzle_param[0] = g;
-        tex->swizzle_param[1] = b;
-        tex->swizzle_param[2] = a;
-        tex->swizzle_param[3] = r;
-        tex->format = transfer_format;
-
-        GLES.glTexParameteri(target, GL_TEXTURE_SWIZZLE_R, tex->swizzle_param[0]);
-        GLES.glTexParameteri(target, GL_TEXTURE_SWIZZLE_G, tex->swizzle_param[1]);
-        GLES.glTexParameteri(target, GL_TEXTURE_SWIZZLE_B, tex->swizzle_param[2]);
-        GLES.glTexParameteri(target, GL_TEXTURE_SWIZZLE_A, tex->swizzle_param[3]);
-        CHECK_GL_ERROR
+    if (transfer_format == GL_BGRA) {
+        LOG_D("Detected GL_BGRA format @ tex = %d, swizzle R←G G←B B←A A←R", tex->texture)
+        tex->swizzle_param[0] = GL_GREEN;
+        tex->swizzle_param[1] = GL_BLUE;
+        tex->swizzle_param[2] = GL_ALPHA;
+        tex->swizzle_param[3] = GL_RED;
+        GLES.glTexParameteri(target, GL_TEXTURE_SWIZZLE_R, GL_GREEN);
+        GLES.glTexParameteri(target, GL_TEXTURE_SWIZZLE_G, GL_BLUE);
+        GLES.glTexParameteri(target, GL_TEXTURE_SWIZZLE_B, GL_ALPHA);
+        GLES.glTexParameteri(target, GL_TEXTURE_SWIZZLE_A, GL_RED);
     }
 
     tex->format = format;
@@ -990,12 +975,17 @@ void glTexSubImage2D(GLenum target, GLint level, GLint xoffset, GLint yoffset, G
           glEnumToString(target), level, xoffset, yoffset, width, height, glEnumToString(format), glEnumToString(type),
           pixels)
 
-    if (format == GL_BGRA && (type == GL_UNSIGNED_INT_8_8_8_8 || type == GL_UNSIGNED_INT_8_8_8_8_REV)) {
-        glTexParameteri(target, GL_TEXTURE_SWIZZLE_R,  GL_BLUE);
-        glTexParameteri(target, GL_TEXTURE_SWIZZLE_B,  GL_RED);
-
-        format = GL_RGBA;
-        type = GL_UNSIGNED_BYTE;
+    if (format == GL_BGRA) {
+        GET_TEXTURE_OBJECT(target);
+        LOG_D("Detected GL_BGRA format @ tex = %d in glTexSubImage2D, swizzle R←G G←B B←A A←R", tex->texture)
+        tex->swizzle_param[0] = GL_GREEN;
+        tex->swizzle_param[1] = GL_BLUE;
+        tex->swizzle_param[2] = GL_ALPHA;
+        tex->swizzle_param[3] = GL_RED;
+        GLES.glTexParameteri(target, GL_TEXTURE_SWIZZLE_R, GL_GREEN);
+        GLES.glTexParameteri(target, GL_TEXTURE_SWIZZLE_G, GL_BLUE);
+        GLES.glTexParameteri(target, GL_TEXTURE_SWIZZLE_B, GL_ALPHA);
+        GLES.glTexParameteri(target, GL_TEXTURE_SWIZZLE_A, GL_RED);
     }
 
     GLES.glTexSubImage2D(target, level, xoffset, yoffset, width, height, format, type, pixels);
