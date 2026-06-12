@@ -36,6 +36,36 @@ int nlevel(int size, int level) {
     return size;
 }
 
+static void set_bgra_upload_swizzle(GLenum target, TextureObject* tex, GLenum type) {
+    if (type == GL_UNSIGNED_INT_8_8_8_8) {
+        LOG_D("Detected GL_BGRA/GL_UNSIGNED_INT_8_8_8_8 upload @ tex = %d, swizzle R←G G←B B←A A←R", tex->texture)
+        tex->swizzle_param[0] = GL_GREEN;
+        tex->swizzle_param[1] = GL_BLUE;
+        tex->swizzle_param[2] = GL_ALPHA;
+        tex->swizzle_param[3] = GL_RED;
+    } else {
+        LOG_D("Detected GL_BGRA upload @ tex = %d, swizzle R←B G←G B←R A←A", tex->texture)
+        tex->swizzle_param[0] = GL_BLUE;
+        tex->swizzle_param[1] = GL_GREEN;
+        tex->swizzle_param[2] = GL_RED;
+        tex->swizzle_param[3] = GL_ALPHA;
+    }
+
+    GLES.glTexParameteri(target, GL_TEXTURE_SWIZZLE_R, tex->swizzle_param[0]);
+    GLES.glTexParameteri(target, GL_TEXTURE_SWIZZLE_G, tex->swizzle_param[1]);
+    GLES.glTexParameteri(target, GL_TEXTURE_SWIZZLE_B, tex->swizzle_param[2]);
+    GLES.glTexParameteri(target, GL_TEXTURE_SWIZZLE_A, tex->swizzle_param[3]);
+}
+
+static void normalize_bgra_upload(GLenum* format, GLenum* type) {
+    if (*format != GL_BGRA) return;
+
+    *format = GL_RGBA;
+    if (*type == GL_UNSIGNED_INT_8_8_8_8 || *type == GL_UNSIGNED_INT_8_8_8_8_REV) {
+        *type = GL_UNSIGNED_BYTE;
+    }
+}
+
 GLenum ConvertTextureTargetToGLEnum(TextureTarget target) {
     switch (target) {
     case TextureTarget::TEXTURE_1D:
@@ -538,6 +568,7 @@ void glTexImage2D(GLenum target, GLint level, GLint internalFormat, GLsizei widt
                   GLenum format, GLenum type, const GLvoid* pixels) {
     LOG()
     GLenum transfer_format = format;
+    GLenum transfer_type = type;
 
     LOG_D("mg_glTexImage2D,target: %s,level: %d,internalFormat: %s->%s,width: "
           "%d,height: %d,border: %d,format: %s,type: %s, pixels: 0x%x",
@@ -571,15 +602,7 @@ void glTexImage2D(GLenum target, GLint level, GLint internalFormat, GLsizei widt
     tex->swizzle_param[3] = GL_ALPHA;
 
     if (transfer_format == GL_BGRA) {
-        LOG_D("Detected GL_BGRA format @ tex = %d, swizzle R←G G←B B←A A←R", tex->texture)
-        tex->swizzle_param[0] = GL_GREEN;
-        tex->swizzle_param[1] = GL_BLUE;
-        tex->swizzle_param[2] = GL_ALPHA;
-        tex->swizzle_param[3] = GL_RED;
-        GLES.glTexParameteri(target, GL_TEXTURE_SWIZZLE_R, GL_GREEN);
-        GLES.glTexParameteri(target, GL_TEXTURE_SWIZZLE_G, GL_BLUE);
-        GLES.glTexParameteri(target, GL_TEXTURE_SWIZZLE_B, GL_ALPHA);
-        GLES.glTexParameteri(target, GL_TEXTURE_SWIZZLE_A, GL_RED);
+        set_bgra_upload_swizzle(target, tex, transfer_type);
     }
 
     tex->format = format;
@@ -977,15 +1000,8 @@ void glTexSubImage2D(GLenum target, GLint level, GLint xoffset, GLint yoffset, G
 
     if (format == GL_BGRA) {
         GET_TEXTURE_OBJECT(target);
-        LOG_D("Detected GL_BGRA format @ tex = %d in glTexSubImage2D, swizzle R←G G←B B←A A←R", tex->texture)
-        tex->swizzle_param[0] = GL_GREEN;
-        tex->swizzle_param[1] = GL_BLUE;
-        tex->swizzle_param[2] = GL_ALPHA;
-        tex->swizzle_param[3] = GL_RED;
-        GLES.glTexParameteri(target, GL_TEXTURE_SWIZZLE_R, GL_GREEN);
-        GLES.glTexParameteri(target, GL_TEXTURE_SWIZZLE_G, GL_BLUE);
-        GLES.glTexParameteri(target, GL_TEXTURE_SWIZZLE_B, GL_ALPHA);
-        GLES.glTexParameteri(target, GL_TEXTURE_SWIZZLE_A, GL_RED);
+        set_bgra_upload_swizzle(target, tex, type);
+        normalize_bgra_upload(&format, &type);
     }
 
     GLES.glTexSubImage2D(target, level, xoffset, yoffset, width, height, format, type, pixels);
