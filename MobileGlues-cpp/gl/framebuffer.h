@@ -15,6 +15,7 @@ struct attachment_t {
     GLenum textarget;
     GLuint texture;
     GLint level;
+    GLint layer;
 };
 struct framebuffer_t {
     bool initialized = false;
@@ -35,6 +36,7 @@ extern "C"
     GLAPI GLAPIENTRY void glFramebufferTexture2D(GLenum target, GLenum attachment, GLenum textarget, GLuint texture,
                                                  GLint level);
     GLAPI GLAPIENTRY void glFramebufferTexture(GLenum target, GLenum attachment, GLuint texture, GLint level);
+    GLAPI GLAPIENTRY void glFramebufferTextureLayer(GLenum target, GLenum attachment, GLuint texture, GLint level, GLint layer);
     GLAPI GLAPIENTRY void glDrawBuffer(GLenum buf);
     GLAPI GLAPIENTRY void glDrawBuffers(GLsizei n, const GLenum* bufs);
     GLAPI GLAPIENTRY void glReadBuffer(GLenum src);

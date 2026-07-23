@@ -40,6 +40,9 @@ void init_framebuffer(framebuffer_t& fbo) {
     if (!fbo.initialized) {
         fbo.color_attachments = new attachment_t[MAX_COLOR_ATTACHMENTS];
         memset(fbo.color_attachments, 0, sizeof(attachment_t) * MAX_COLOR_ATTACHMENTS);
+        for (int i = 0; i < MAX_COLOR_ATTACHMENTS; i++) {
+            fbo.color_attachments[i].layer = -1;
+        }
         fbo.initialized = true;
     }
 }
@@ -73,11 +76,25 @@ void update_attachment(GLenum target, GLenum attachment, GLenum textarget, GLuin
     framebuffer_t& fbo = framebuffers[current_fbo];
     if (attachment >= GL_COLOR_ATTACHMENT0 && attachment < GL_COLOR_ATTACHMENT0 + MAX_COLOR_ATTACHMENTS) {
         int index = attachment - GL_COLOR_ATTACHMENT0;
-        fbo.color_attachments[index] = {textarget, texture, level};
+        fbo.color_attachments[index] = {textarget, texture, level, 0};
     } else if (attachment == GL_DEPTH_ATTACHMENT) {
-        fbo.depth_attachment = {textarget, texture, level};
+        fbo.depth_attachment = {textarget, texture, level, 0};
     } else if (attachment == GL_STENCIL_ATTACHMENT) {
-        fbo.stencil_attachment = {textarget, texture, level};
+        fbo.stencil_attachment = {textarget, texture, level, 0};
+    }
+}
+
+void update_attachment_layer(GLenum target, GLenum attachment, GLenum textarget, GLuint texture, GLint level, GLint layer) {
+    GLuint current_fbo = (target == GL_READ_FRAMEBUFFER) ? current_read_fbo : current_draw_fbo;
+    if (current_fbo == 0) return;
+    framebuffer_t& fbo = framebuffers[current_fbo];
+    if (attachment >= GL_COLOR_ATTACHMENT0 && attachment < GL_COLOR_ATTACHMENT0 + MAX_COLOR_ATTACHMENTS) {
+        int index = attachment - GL_COLOR_ATTACHMENT0;
+        fbo.color_attachments[index] = {textarget, texture, level, layer};
+    } else if (attachment == GL_DEPTH_ATTACHMENT) {
+        fbo.depth_attachment = {textarget, texture, level, layer};
+    } else if (attachment == GL_STENCIL_ATTACHMENT) {
+        fbo.stencil_attachment = {textarget, texture, level, layer};
     }
 }
 void glFramebufferTexture2D(GLenum target, GLenum attachment, GLenum textarget, GLuint texture, GLint level) {
@@ -87,6 +104,10 @@ void glFramebufferTexture2D(GLenum target, GLenum attachment, GLenum textarget, 
 void glFramebufferTexture(GLenum target, GLenum attachment, GLuint texture, GLint level) {
     update_attachment(target, attachment, GL_TEXTURE_2D, texture, level);
     GLES.glFramebufferTexture(target, attachment, texture, level);
+}
+void glFramebufferTextureLayer(GLenum target, GLenum attachment, GLuint texture, GLint level, GLint layer) {
+    update_attachment_layer(target, attachment, GL_TEXTURE_2D_ARRAY, texture, level, layer);
+    GLES.glFramebufferTextureLayer(target, attachment, texture, level, layer);
 }
 void glDrawBuffer(GLenum buffer) {
     LOG()
@@ -149,8 +170,13 @@ void glDrawBuffers(GLsizei n, const GLenum* bufs) {
             new_bufs[i] = physical_attachment;
             int index = logical_attachment - GL_COLOR_ATTACHMENT0;
             attachment_t& attach = fbo.color_attachments[index];
-            GLES.glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, physical_attachment, attach.textarget, attach.texture,
-                                        attach.level);
+            if (attach.texture != 0 && attach.layer != -1 && attach.textarget == GL_TEXTURE_2D_ARRAY) {
+                GLES.glFramebufferTextureLayer(GL_DRAW_FRAMEBUFFER, physical_attachment, attach.texture,
+                                               attach.level, attach.layer);
+            } else {
+                GLES.glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, physical_attachment, attach.textarget, attach.texture,
+                                            attach.level);
+            }
         } else {
             new_bufs[i] = bufs[i];
         }
